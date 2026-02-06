@@ -95,8 +95,8 @@ class _LottieWeatherLoadingState extends State<LottieWeatherLoading>
         elementCount = 6;
         break;
       case WeatherCondition.smoke:
-      default:
         elementCount = 6;
+        break;
     }
     
     for (int i = 0; i < elementCount; i++) {
@@ -126,7 +126,6 @@ class _LottieWeatherLoadingState extends State<LottieWeatherLoading>
         return FloatingElementType.lightning;
       case WeatherCondition.misty:
       case WeatherCondition.smoke:
-      default:
         final types = FloatingElementType.values;
         return types[index % types.length];
     }
@@ -147,7 +146,6 @@ class _LottieWeatherLoadingState extends State<LottieWeatherLoading>
       case WeatherCondition.misty:
         return 'assets/lottie/misty_loading.json';
       case WeatherCondition.smoke:
-      default:
         return 'assets/lottie/weather_loading.json';
     }
   }
@@ -167,7 +165,6 @@ class _LottieWeatherLoadingState extends State<LottieWeatherLoading>
       case WeatherCondition.misty:
         return 'Walking in the mist! 🌫️';
       case WeatherCondition.smoke:
-      default:
         return 'Loading your weather experience...';
     }
   }
@@ -512,7 +509,6 @@ class _LottieWeatherLoadingState extends State<LottieWeatherLoading>
         ];
       case WeatherCondition.misty:
       case WeatherCondition.smoke:
-      default:
         return [
           Colors.blue.shade900.withOpacity(0.9),
           Colors.blue.shade800.withOpacity(0.9),

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../data/models/weather_model.dart';
 import '../../data/models/forecast_model.dart';
 import '../../data/datasources/weather_remote_data_source.dart';
@@ -7,6 +9,7 @@ import '../../../../core/network/network_info.dart';
 import '../../../../core/network/http_client.dart';
 
 enum WeatherStatus { initial, loading, success, error }
+enum LocationPermissionStatus { denied, granted, permanentlyDenied }
 
 class WeatherProvider extends ChangeNotifier {
   final NetworkInfo networkInfo;
@@ -24,6 +27,8 @@ class WeatherProvider extends ChangeNotifier {
   List<ForecastModel> _forecast = [];
   String _errorMessage = '';
   bool _isOffline = false;
+  LocationPermissionStatus? _permissionStatus;
+  bool _usingCurrentLocation = false;
   
   WeatherStatus get status => _status;
   WeatherModel? get weather => _weather;
@@ -31,6 +36,8 @@ class WeatherProvider extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   bool get isOffline => _isOffline;
   bool get hasWeather => _weather != null;
+  LocationPermissionStatus? get permissionStatus => _permissionStatus;
+  bool get usingCurrentLocation => _usingCurrentLocation;
   
   void _setStatus(WeatherStatus status) {
     _status = status;
@@ -45,11 +52,12 @@ class WeatherProvider extends ChangeNotifier {
   Future<void> fetchWeather(String city) async {
     if (!await networkInfo.isConnected) {
       _isOffline = true;
-      _setError('No internet connection');
+      _setError('No internet connection. Please check your connection and try again.');
       return;
     }
     
     _isOffline = false;
+    _usingCurrentLocation = false;
     _setStatus(WeatherStatus.loading);
     
     try {
@@ -61,14 +69,60 @@ class WeatherProvider extends ChangeNotifier {
       
       _setStatus(WeatherStatus.success);
     } catch (e) {
-      _setError('Failed to fetch weather data: $e');
+      _setError('Failed to fetch weather: ${e.toString()}');
     }
   }
   
   Future<void> fetchWeatherByLocation() async {
-    // This would use geolocator to get current location
-    // For now, we'll use a default city
-    await fetchWeather('London');
+    if (!await networkInfo.isConnected) {
+      _isOffline = true;
+      _setError('No internet connection. Please check your connection and try again.');
+      return;
+    }
+    
+    _isOffline = false;
+    _setStatus(WeatherStatus.loading);
+    
+    try {
+      // Check and request location permission
+      PermissionStatus status = await Permission.location.request();
+      
+      if (status.isDenied) {
+        _permissionStatus = LocationPermissionStatus.denied;
+        _setError('Location permission is required to use current location.');
+        return;
+      } else if (status.isPermanentlyDenied) {
+        _permissionStatus = LocationPermissionStatus.permanentlyDenied;
+        _setError('Location permission is permanently denied. Please enable it in settings.');
+        return;
+      }
+      
+      _permissionStatus = LocationPermissionStatus.granted;
+      
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      
+      // Fetch weather using coordinates
+      _weather = await _dataSource.getWeatherByCoordinates(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      
+      // Get forecast data
+      _forecast = await _dataSource.getForecastByCoordinates(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      
+      _usingCurrentLocation = true;
+      _setStatus(WeatherStatus.success);
+    } on PermissionStatus catch (e) {
+      _setError('Permission error: $e');
+    } catch (e) {
+      _setError('Failed to get location: $e');
+    }
   }
 
   

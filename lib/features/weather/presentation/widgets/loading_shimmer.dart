@@ -53,7 +53,6 @@ class LoadingShimmer extends StatelessWidget {
       case WeatherCondition.misty:
         return 'Reading the mist... 🌫️';
       case WeatherCondition.smoke:
-      default:
         return 'Loading weather magic... ✨';
     }
   }

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:app_settings/app_settings.dart';
 import '../../../../shared/widgets/animated_weather_background.dart';
 import '../providers/weather_provider.dart';
 import '../widgets/current_weather_card.dart';
 import '../widgets/forecast_list.dart';
 import '../widgets/loading_shimmer.dart';
-import '../widgets/error_widget.dart';
+import '../widgets/error_state_screen.dart';
 import '../widgets/location_search_bar.dart';
 import '../../domain/entities/weather_condition.dart';
+import 'settings_screen.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -61,14 +63,28 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
 
     if (provider.status == WeatherStatus.error) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: CustomErrorWidget(
-            message: provider.errorMessage,
-            onRetry: () => _retry(provider),
-          ),
-        ),
+      ErrorStateType errorType = ErrorStateType.generic;
+
+      if (provider.isOffline) {
+        errorType = ErrorStateType.offline;
+      } else if (provider.permissionStatus == LocationPermissionStatus.denied ||
+          provider.permissionStatus == LocationPermissionStatus.permanentlyDenied) {
+        errorType = ErrorStateType.permissionDenied;
+      } else if (provider.errorMessage.contains('Failed to get location')) {
+        errorType = ErrorStateType.notFound;
+      } else if (provider.errorMessage.contains('connection')) {
+        errorType = ErrorStateType.networkError;
+      }
+
+      return ErrorStateScreen(
+        errorType: errorType,
+        customMessage: provider.errorMessage,
+        onRetry: () => _retry(provider),
+        onOpenSettings: errorType == ErrorStateType.permissionDenied
+            ? () async {
+                await AppSettings.openAppSettings();
+              }
+            : null,
       );
     }
 
@@ -79,85 +95,144 @@ class _WeatherScreenState extends State<WeatherScreen> {
         children: [
           const SizedBox(height: 40),
 
-          // App Header with location and refresh
+          // Advanced Header with date, time, and quick stats
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Top row with app name and controls
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Weatherly',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    if (provider.hasWeather)
-                      Text(
-                        provider.weather!.cityName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.9),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Weatherly',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getCurrentDateTime(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.refresh,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          onPressed: () => _retry(provider),
+                        ),
+                        IconButton(
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.settings,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.refresh,
-                      color: Colors.white,
-                      size: 24,
+
+                const SizedBox(height: 24),
+
+                // Location with icon
+                if (provider.hasWeather)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: Colors.white.withOpacity(0.9),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${provider.weather!.cityName}${provider.usingCurrentLocation ? ' • Current Location' : ''}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.white.withOpacity(0.9),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                const SizedBox(height: 20),
+
+                // Removed redundant top temperature card — main display below
+
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: LocationSearchBar(
+                    onSearch: (city) => provider.fetchWeather(city),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Current weather
+                if (provider.hasWeather) CurrentWeatherCard(weather: provider.weather!),
+
+                const SizedBox(height: 32),
+
+                // 7-Day Forecast
+                if (provider.forecast.isNotEmpty) ForecastList(forecasts: provider.forecast),
+
+                const SizedBox(height: 32),
+
+                // Footer
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: Center(
+                    child: Text(
+                      'Updated ${_getUpdateTime(provider.weather?.dateTime)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
                     ),
                   ),
-                  onPressed: () => _retry(provider),
                 ),
               ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Search bar
-          LocationSearchBar(
-            onSearch: (city) => provider.fetchWeather(city),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Current weather
-          if (provider.hasWeather)
-            CurrentWeatherCard(weather: provider.weather!),
-
-          const SizedBox(height: 32),
-
-          // 7-Day Forecast
-          if (provider.forecast.isNotEmpty)
-            ForecastList(forecasts: provider.forecast),
-
-          const SizedBox(height: 32),
-
-          // Footer
-          Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Center(
-              child: Text(
-                'Updated ${_getUpdateTime(provider.weather?.dateTime)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withOpacity(0.6),
-                ),
-              ),
             ),
           ),
         ],
@@ -207,5 +282,69 @@ class _WeatherScreenState extends State<WeatherScreen> {
       return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
     }
     return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+  }
+
+  String _getCurrentDateTime() {
+    final now = DateTime.now();
+    final months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final dayName = days[now.weekday - 1];
+    final monthName = months[now.month - 1];
+    final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    return '$dayName, $monthName ${now.day} • $time';
+  }
+
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: Colors.white.withOpacity(0.8),
+          size: 20,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.white.withOpacity(0.7),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return this[0].toUpperCase() + substring(1);
   }
 }

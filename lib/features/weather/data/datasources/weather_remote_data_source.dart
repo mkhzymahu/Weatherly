@@ -7,6 +7,10 @@ abstract class WeatherRemoteDataSource {
   Future<WeatherModel> getCurrentWeather(String cityName);
   Future<List<ForecastModel>> getForecast(String cityName);
   Future<WeatherModel> getWeatherByLocation(double lat, double lon);
+  Future<WeatherModel> getWeatherByCoordinates(
+      {required double latitude, required double longitude});
+  Future<List<ForecastModel>> getForecastByCoordinates(
+      {required double latitude, required double longitude});
 }
 
 class WeatherRemoteDataSourceImpl implements WeatherRemoteDataSource {
@@ -64,5 +68,35 @@ class WeatherRemoteDataSourceImpl implements WeatherRemoteDataSource {
     );
     
     return WeatherModel.fromJson(response);
+  }
+
+  @override
+  Future<WeatherModel> getWeatherByCoordinates({
+    required double latitude,
+    required double longitude,
+  }) async {
+    return getWeatherByLocation(latitude, longitude);
+  }
+
+  @override
+  Future<List<ForecastModel>> getForecastByCoordinates({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final params = _getBaseParams()
+      ..addAll({
+        'lat': latitude.toString(),
+        'lon': longitude.toString(),
+      });
+    
+    final response = await httpClient.get(
+      '${ApiConstants.baseUrl}${ApiConstants.forecast}',
+      params,
+    );
+    
+    final List<dynamic> forecastList = response['list'];
+    return forecastList
+        .map((json) => ForecastModel.fromJson(json))
+        .toList();
   }
 }

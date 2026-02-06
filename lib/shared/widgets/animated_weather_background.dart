@@ -255,15 +255,7 @@ class _AnimatedWeatherBackgroundState extends State<AnimatedWeatherBackground>
           ],
         );
 
-      default:
-        return const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF90CAF9),
-            Color(0xFFE3F2FD),
-          ],
-        );
+      // all cases handled above
     }
   }
 
