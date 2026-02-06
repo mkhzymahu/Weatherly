@@ -1,6 +1,6 @@
 class ApiConstants {
   static const String baseUrl = 'https://api.openweathermap.org/data/2.5';
-  static const String apiKey = '40dc8dca024068318789512e792a2cf0';
+  static const String apiKey = 'API_KEY_HERE';
   
   static const String currentWeather = '/weather';
   static const String forecast = '/forecast';
