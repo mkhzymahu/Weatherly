@@ -1,0 +1,6 @@
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Weatherly needs your location to show local weather</string>
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Weatherly needs your location to show local weather</string>
+<key>NSLocationAlwaysUsageDescription</key>
+<string>Weatherly needs your location to show local weather</string>
